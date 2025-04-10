@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import axios from 'axios';
 
 const Dashboard = ({ user, role }) => {
   const [stats, setStats] = useState({
@@ -7,14 +8,112 @@ const Dashboard = ({ user, role }) => {
     availableUnits: 0,
   });
 
+  const [userData, setUserData] = useState({
+    blood_group: '',
+    last_donation: null,
+    next_eligible_date: null,
+  });
+
   useEffect(() => {
-    // Simulate fetching dashboard data
-    setStats({
-      totalDonations: 150,
-      pendingRequests: 5,
-      availableUnits: 75,
-    });
-  }, []);
+    const fetchUserData = async () => {
+      try {
+        // Get the token from localStorage
+        const token = localStorage.getItem('token');
+        if (!token) {
+          console.error('No token found');
+          return;
+        }
+
+        // Fetch user data from the backend
+        const response = await axios.get('http://localhost:8000/users/me', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        console.log('User data from backend:', response.data); // Debug log
+
+        // Get user's donation history
+        const donationsResponse = await axios.get('http://localhost:8000/donations/', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        console.log('Donations data:', donationsResponse.data); // Debug log
+
+        // Find the user's latest donation
+        const userDonations = donationsResponse.data.filter(
+          donation => donation.user_id === response.data.id
+        );
+        const lastDonation = userDonations.length > 0 
+          ? new Date(Math.max(...userDonations.map(d => new Date(d.date))))
+          : null;
+
+        // Calculate next eligible date (3 months after last donation)
+        const nextEligibleDate = lastDonation 
+          ? new Date(lastDonation.getTime() + (90 * 24 * 60 * 60 * 1000))
+          : new Date();
+
+        setUserData({
+          blood_group: response.data.blood_group || 'Not specified',
+          last_donation: lastDonation,
+          next_eligible_date: nextEligibleDate,
+        });
+
+        console.log('Updated user data state:', {
+          blood_group: response.data.blood_group || 'Not specified',
+          last_donation: lastDonation,
+          next_eligible_date: nextEligibleDate,
+        }); // Debug log
+
+        // Update stats if needed
+        if (role === 'hospital' || role === 'admin') {
+          setStats({
+            totalDonations: userDonations.length,
+            pendingRequests: 5,
+            availableUnits: 75,
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching user data:', error.response?.data || error.message);
+      }
+    };
+
+    fetchUserData();
+  }, [user, role]);
+
+  const formatDate = (date) => {
+    if (!date) return 'No donations yet';
+    
+    const now = new Date();
+    const diffTime = Math.abs(now - new Date(date));
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays < 30) {
+      return `${diffDays} days ago`;
+    } else {
+      const diffMonths = Math.floor(diffDays / 30);
+      return `${diffMonths} month${diffMonths > 1 ? 's' : ''} ago`;
+    }
+  };
+
+  const formatNextEligible = (date) => {
+    if (!date) return 'Eligible now';
+    
+    const now = new Date();
+    const diffTime = new Date(date) - now;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays <= 0) {
+      return 'Eligible now';
+    } else if (diffDays < 30) {
+      return `In ${diffDays} days`;
+    } else {
+      const diffMonths = Math.floor(diffDays / 30);
+      return `In ${diffMonths} month${diffMonths > 1 ? 's' : ''}`;
+    }
+  };
 
   const renderUserDashboard = () => (
     <div className="space-y-6">
@@ -22,15 +121,17 @@ const Dashboard = ({ user, role }) => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white p-6 rounded-lg shadow-md">
           <h3 className="text-lg font-semibold mb-2">Your Blood Group</h3>
-          <p className="text-3xl font-bold text-red-600">A+</p>
+          <p className="text-3xl font-bold text-red-600">
+            {userData.blood_group || 'Not specified'}
+          </p>
         </div>
         <div className="bg-white p-6 rounded-lg shadow-md">
           <h3 className="text-lg font-semibold mb-2">Last Donation</h3>
-          <p className="text-gray-600">3 months ago</p>
+          <p className="text-gray-600">{formatDate(userData.last_donation)}</p>
         </div>
         <div className="bg-white p-6 rounded-lg shadow-md">
           <h3 className="text-lg font-semibold mb-2">Next Eligible</h3>
-          <p className="text-gray-600">In 1 month</p>
+          <p className="text-gray-600">{formatNextEligible(userData.next_eligible_date)}</p>
         </div>
       </div>
     </div>

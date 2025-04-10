@@ -65,6 +65,13 @@ class User(BaseModel):
     full_name: str
     role: str
     disabled: bool = False
+    # Add additional user fields
+    blood_group: Optional[str] = None
+    phone_number: Optional[str] = None
+    address: Optional[str] = None
+    date_of_birth: Optional[str] = None
+    medical_history: Optional[str] = None
+    biometric_data: Optional[str] = None
 
     class Config:
         json_encoders = {ObjectId: str}
@@ -83,6 +90,35 @@ class UserCreate(BaseModel):
     password: str
     full_name: str
     role: str
+    # Common fields
+    phone_number: Optional[str] = None
+    address: Optional[str] = None
+    
+    # User specific fields
+    date_of_birth: Optional[str] = None
+    blood_group: Optional[str] = None
+    medical_history: Optional[str] = None
+    biometric_data: Optional[str] = None
+    
+    # Hospital specific fields
+    hospital_name: Optional[str] = None
+    hospital_registration_number: Optional[str] = None
+    emergency_contact: Optional[str] = None
+    available_facilities: Optional[List[str]] = None
+    
+    # Paramedic specific fields
+    license_number: Optional[str] = None
+    certification: Optional[str] = None
+    years_of_experience: Optional[int] = None
+    specialization: Optional[str] = None
+
+    # Blood Bank specific fields
+    blood_bank_name: Optional[str] = None
+    storage_capacity: Optional[int] = None
+    blood_types_available: Optional[List[str]] = None
+    operating_hours: Optional[str] = None
+    emergency_service: Optional[bool] = None
+    certification_details: Optional[str] = None
 
     class Config:
         json_encoders = {ObjectId: str}
@@ -156,7 +192,13 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         email=user["email"],
         full_name=user["full_name"],
         role=user["role"],
-        disabled=user.get("disabled", False)
+        disabled=user.get("disabled", False),
+        blood_group=user.get("blood_group"),
+        phone_number=user.get("phone_number"),
+        address=user.get("address"),
+        date_of_birth=user.get("date_of_birth"),
+        medical_history=user.get("medical_history"),
+        biometric_data=user.get("biometric_data")
     )
 
 # Routes
@@ -200,8 +242,57 @@ async def create_user(user: UserCreate):
         "hashed_password": hashed_password,
         "full_name": user.full_name,
         "role": user.role,
+        "phone_number": user.phone_number,
+        "address": user.address,
         "disabled": False
     }
+
+    # Add role-specific fields
+    if user.role == "user":
+        user_dict.update({
+            "date_of_birth": user.date_of_birth,
+            "blood_group": user.blood_group,
+            "medical_history": user.medical_history,
+            "biometric_data": user.biometric_data
+        })
+    elif user.role == "hospital":
+        if not all([user.hospital_name, user.hospital_registration_number]):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Hospital name and registration number are required for hospital registration"
+            )
+        user_dict.update({
+            "hospital_name": user.hospital_name,
+            "hospital_registration_number": user.hospital_registration_number,
+            "emergency_contact": user.emergency_contact,
+            "available_facilities": user.available_facilities
+        })
+    elif user.role == "paramedic":
+        if not all([user.license_number, user.certification, user.years_of_experience is not None]):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="License number, certification, and years of experience are required for paramedic registration"
+            )
+        user_dict.update({
+            "license_number": user.license_number,
+            "certification": user.certification,
+            "years_of_experience": user.years_of_experience,
+            "specialization": user.specialization
+        })
+    elif user.role == "blood_bank":
+        if not all([user.blood_bank_name, user.license_number]):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Blood bank name and license number are required for blood bank registration"
+            )
+        user_dict.update({
+            "blood_bank_name": user.blood_bank_name,
+            "license_number": user.license_number,
+            "storage_capacity": user.storage_capacity,
+            "operating_hours": user.operating_hours,
+            "emergency_service": user.emergency_service,
+            "certification_details": user.certification_details
+        })
     
     result = await db.users.insert_one(user_dict)
     created_user = await db.users.find_one({"_id": result.inserted_id})
@@ -218,12 +309,50 @@ async def create_user(user: UserCreate):
 async def read_users_me(current_user: User = Depends(get_current_user)):
     return current_user
 
+@app.put("/users/me", response_model=User)
+async def update_user(
+    user_data: dict,
+    current_user: User = Depends(get_current_user)
+):
+    try:
+        # Remove fields that shouldn't be updated
+        if "id" in user_data:
+            del user_data["id"]
+        if "username" in user_data:
+            del user_data["username"]
+        if "email" in user_data:
+            del user_data["email"]
+        if "role" in user_data:
+            del user_data["role"]
+
+        # Update user in database
+        result = await db.users.update_one(
+            {"_id": current_user.id},
+            {"$set": user_data}
+        )
+
+        if result.modified_count == 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User not updated"
+            )
+
+        # Get updated user
+        updated_user = await db.users.find_one({"_id": current_user.id})
+        return User(**updated_user)
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
 @app.post("/blood-requests/", response_model=BloodRequest)
 async def create_blood_request(
     request: BloodRequest,
     current_user: User = Depends(get_current_user)
 ):
-    if current_user.role not in ["hospital", "admin"]:
+    if current_user.role not in ["hospital", "blood_bank"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to create blood requests"

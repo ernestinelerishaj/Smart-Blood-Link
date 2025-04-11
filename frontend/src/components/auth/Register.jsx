@@ -3,12 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { FaUser, FaEnvelope, FaLock, FaIdCard, FaUserMd, FaHospital, FaPhone, FaMapMarkerAlt, FaTint, FaCalendar, FaFileAlt, FaFingerprint, FaCertificate, FaBriefcaseMedical, FaAward, FaClock, FaAmbulance } from 'react-icons/fa';
 
-const Register = () => {
+const Register = ({ setUser, setRole }) => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     username: '',
     email: '',
     password: '',
+    confirm_password: '',
     full_name: '',
     role: 'user',
     phone_number: '',
@@ -23,6 +24,16 @@ const Register = () => {
     hospital_registration_number: '',
     emergency_contact: '',
     available_facilities: [],
+    other_facilities: '',
+    // Facility checkboxes
+    facility_icu: false,
+    facility_emergency: false,
+    facility_blood_bank: false,
+    facility_pharmacy: false,
+    facility_lab: false,
+    facility_patient_care: false,
+    facility_ambulance: false,
+    facility_others: false,
     // Paramedic specific fields
     license_number: '',
     certification: '',
@@ -37,11 +48,20 @@ const Register = () => {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [registrationSuccess, setRegistrationSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
+
+    // Check if passwords match
+    if (formData.password !== formData.confirm_password) {
+      setError('Passwords do not match');
+      setLoading(false);
+      return;
+    }
 
     try {
       // Create a new object with only the common fields
@@ -49,7 +69,7 @@ const Register = () => {
         username: formData.username,
         email: formData.email,
         password: formData.password,
-        full_name: formData.full_name,
+        full_name: formData.full_name || formData.username, // Use username as full_name if removed
         role: formData.role,
         phone_number: formData.phone_number,
         address: formData.address,
@@ -64,11 +84,24 @@ const Register = () => {
           biometric_data: formData.biometric_data,
         });
       } else if (formData.role === 'hospital') {
+        // Process facilities from checkboxes into an array
+        const facilities = [];
+        if (formData.facility_icu) facilities.push('ICU');
+        if (formData.facility_emergency) facilities.push('Emergency Room');
+        if (formData.facility_blood_bank) facilities.push('Blood Bank');
+        if (formData.facility_pharmacy) facilities.push('Pharmacy');
+        if (formData.facility_lab) facilities.push('Lab Services');
+        if (formData.facility_patient_care) facilities.push('Inpatient/Outpatient');
+        if (formData.facility_ambulance) facilities.push('Ambulance');
+        if (formData.facility_others && formData.other_facilities) {
+          facilities.push(formData.other_facilities);
+        }
+
         Object.assign(submitData, {
           hospital_name: formData.hospital_name,
           hospital_registration_number: formData.hospital_registration_number,
           emergency_contact: formData.emergency_contact,
-          available_facilities: formData.available_facilities,
+          available_facilities: facilities,
         });
       } else if (formData.role === 'paramedic') {
         Object.assign(submitData, {
@@ -91,11 +124,33 @@ const Register = () => {
       const userResponse = await axios.post('http://localhost:8000/users/', submitData);
 
       if (userResponse.data) {
-        navigate('/login', { 
-          state: { 
-            message: 'Registration successful! Please login with your credentials.' 
-          } 
-        });
+        // Get token for immediate login
+        // Use FormData to match the expected format by FastAPI
+        const formDataObj = new FormData();
+        formDataObj.append('username', formData.username);
+        formDataObj.append('password', formData.password);
+
+        const tokenResponse = await axios.post('http://localhost:8000/token', formDataObj);
+
+        if (tokenResponse.data.access_token) {
+          // Store token and user data
+          localStorage.setItem('token', tokenResponse.data.access_token);
+          localStorage.setItem('user', formData.username);
+          localStorage.setItem('role', formData.role);
+
+          // Update App component state
+          setUser(formData.username);
+          setRole(formData.role);
+
+          // Set success state
+          setRegistrationSuccess(true);
+          setSuccessMessage('Registration successful! You are now logged in.');
+
+          // Redirect to dashboard after a short delay
+          setTimeout(() => {
+            navigate('/dashboard');
+          }, 2000);
+        }
       }
     } catch (err) {
       // Handle validation errors from FastAPI
@@ -110,8 +165,10 @@ const Register = () => {
         } else {
           setError('Invalid form data. Please check your inputs.');
         }
+      } else if (err.response?.status === 400 && err.response?.data?.detail?.includes('already registered')) {
+        setError('Username or email already registered. Please try different credentials.');
       } else {
-        setError(err.response?.data?.detail || 'Registration failed. Please try again.');
+      setError(err.response?.data?.detail || 'Registration failed. Please try again.');
       }
     } finally {
       setLoading(false);
@@ -179,7 +236,7 @@ const Register = () => {
         <FaTint className="mr-2" />
         Blood Bank
       </button>
-    </div>
+        </div>
   );
 
   const renderCommonFields = () => (
@@ -210,7 +267,7 @@ const Register = () => {
             required
           />
         </div>
-      </div>
+        </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="form-group">
@@ -228,22 +285,22 @@ const Register = () => {
 
         <div className="form-group">
           <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
-            <FaIdCard className="mr-2" /> Full Name
+            <FaLock className="mr-2" /> Confirm Password
           </label>
           <input
-            type="text"
-            value={formData.full_name}
-            onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+            type="password"
+            value={formData.confirm_password}
+            onChange={(e) => setFormData({ ...formData, confirm_password: e.target.value })}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
             required
           />
         </div>
-      </div>
+        </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="form-group">
           <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
-            <FaPhone className="mr-2" /> Phone Number
+            <FaPhone className="mr-2" /> Contact Number
           </label>
           <input
             type="tel"
@@ -258,11 +315,11 @@ const Register = () => {
           <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
             <FaMapMarkerAlt className="mr-2" /> Address
           </label>
-          <input
-            type="text"
+          <textarea
             value={formData.address}
             onChange={(e) => setFormData({ ...formData, address: e.target.value })}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+            rows="3"
             required
           />
         </div>
@@ -307,29 +364,29 @@ const Register = () => {
             <option value="O-">O-</option>
           </select>
         </div>
-      </div>
+        </div>
 
       <div className="form-group">
         <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
           <FaFileAlt className="mr-2" /> Medical History
         </label>
-        <textarea
+          <textarea
           value={formData.medical_history}
           onChange={(e) => setFormData({ ...formData, medical_history: e.target.value })}
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
-          placeholder="Enter any relevant medical history"
-        />
-      </div>
+            placeholder="Enter any relevant medical history"
+          />
+        </div>
 
       <div className="form-group">
-        <button
-          type="button"
-          onClick={handleBiometric}
+          <button
+            type="button"
+            onClick={handleBiometric}
           className="flex items-center justify-center w-full px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500"
-        >
+          >
           <FaFingerprint className="mr-2" />
           {formData.biometric_data ? 'Biometric Data Collected' : 'Collect Biometric Data'}
-        </button>
+          </button>
       </div>
     </>
   );
@@ -364,33 +421,123 @@ const Register = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="form-group">
-          <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
-            <FaPhone className="mr-2" /> Emergency Contact
-          </label>
-          <input
-            type="tel"
-            value={formData.emergency_contact}
-            onChange={(e) => setFormData({ ...formData, emergency_contact: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
-            required
-          />
-        </div>
+      <div className="form-group">
+        <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
+          <FaPhone className="mr-2" /> 24/7 Emergency Helpline (if any)
+        </label>
+        <input
+          type="tel"
+          value={formData.emergency_contact}
+          onChange={(e) => setFormData({ ...formData, emergency_contact: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+        />
+      </div>
 
-        <div className="form-group">
-          <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
-            <FaBriefcaseMedical className="mr-2" /> Available Facilities
-          </label>
-          <input
-            type="text"
-            value={formData.available_facilities.join(', ')}
-            onChange={(e) => setFormData({ ...formData, available_facilities: e.target.value.split(',').map(f => f.trim()) })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
-            placeholder="Enter facilities separated by commas"
-            required
-          />
+      <div className="form-group mt-4">
+        <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
+          <FaBriefcaseMedical className="mr-2" /> Available Facilities
+        </label>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          <div>
+            <label className="inline-flex items-center">
+              <input
+                type="checkbox"
+                checked={formData.facility_icu}
+                onChange={(e) => setFormData({ ...formData, facility_icu: e.target.checked })}
+                className="form-checkbox h-5 w-5 text-red-600"
+              />
+              <span className="ml-2 text-gray-700">ICU</span>
+            </label>
+          </div>
+          <div>
+            <label className="inline-flex items-center">
+              <input
+                type="checkbox"
+                checked={formData.facility_emergency}
+                onChange={(e) => setFormData({ ...formData, facility_emergency: e.target.checked })}
+                className="form-checkbox h-5 w-5 text-red-600"
+              />
+              <span className="ml-2 text-gray-700">Emergency Room</span>
+            </label>
+          </div>
+          <div>
+            <label className="inline-flex items-center">
+              <input
+                type="checkbox"
+                checked={formData.facility_blood_bank}
+                onChange={(e) => setFormData({ ...formData, facility_blood_bank: e.target.checked })}
+                className="form-checkbox h-5 w-5 text-red-600"
+              />
+              <span className="ml-2 text-gray-700">Blood Bank</span>
+            </label>
+          </div>
+          <div>
+            <label className="inline-flex items-center">
+              <input
+                type="checkbox"
+                checked={formData.facility_pharmacy}
+                onChange={(e) => setFormData({ ...formData, facility_pharmacy: e.target.checked })}
+                className="form-checkbox h-5 w-5 text-red-600"
+              />
+              <span className="ml-2 text-gray-700">Pharmacy</span>
+            </label>
+          </div>
+          <div>
+            <label className="inline-flex items-center">
+              <input
+                type="checkbox"
+                checked={formData.facility_lab}
+                onChange={(e) => setFormData({ ...formData, facility_lab: e.target.checked })}
+                className="form-checkbox h-5 w-5 text-red-600"
+              />
+              <span className="ml-2 text-gray-700">Lab Services</span>
+            </label>
+          </div>
+          <div>
+            <label className="inline-flex items-center">
+              <input
+                type="checkbox"
+                checked={formData.facility_patient_care}
+                onChange={(e) => setFormData({ ...formData, facility_patient_care: e.target.checked })}
+                className="form-checkbox h-5 w-5 text-red-600"
+              />
+              <span className="ml-2 text-gray-700">Inpatient/Outpatient</span>
+            </label>
+          </div>
+          <div>
+            <label className="inline-flex items-center">
+              <input
+                type="checkbox"
+                checked={formData.facility_ambulance}
+                onChange={(e) => setFormData({ ...formData, facility_ambulance: e.target.checked })}
+                className="form-checkbox h-5 w-5 text-red-600"
+              />
+              <span className="ml-2 text-gray-700">Ambulance</span>
+            </label>
+          </div>
+          <div>
+            <label className="inline-flex items-center">
+              <input
+                type="checkbox"
+                checked={formData.facility_others}
+                onChange={(e) => setFormData({ ...formData, facility_others: e.target.checked })}
+                className="form-checkbox h-5 w-5 text-red-600"
+              />
+              <span className="ml-2 text-gray-700">Others</span>
+            </label>
+          </div>
         </div>
+        {formData.facility_others && (
+          <div className="mt-3">
+            <textarea
+              value={formData.other_facilities}
+              onChange={(e) => setFormData({ ...formData, other_facilities: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+              placeholder="Please specify other facilities"
+              rows="2"
+            />
+          </div>
+        )}
       </div>
     </>
   );
@@ -557,7 +704,17 @@ const Register = () => {
          'Blood Bank Registration'}
       </h2>
       
-      {renderRoleSelection()}
+      {registrationSuccess && (
+        <div className="mb-6 p-4 bg-green-100 border-l-4 border-green-500 text-green-700 rounded-md">
+          <div className="flex items-center">
+            <svg className="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
+            <p className="font-medium">{successMessage}</p>
+          </div>
+          <p className="mt-2 text-sm">Redirecting to your dashboard...</p>
+        </div>
+      )}
       
       {error && (
         <div className="mb-6 p-4 bg-red-100 border-l-4 border-red-500 text-red-700 rounded-md">
@@ -566,22 +723,27 @@ const Register = () => {
         </div>
       )}
       
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {renderCommonFields()}
-        
-        {formData.role === 'user' && renderUserFields()}
-        {formData.role === 'hospital' && renderHospitalFields()}
-        {formData.role === 'paramedic' && renderParamedicFields()}
-        {formData.role === 'blood_bank' && renderBloodBankFields()}
+      {!registrationSuccess && (
+        <>
+          {renderRoleSelection()}
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {renderCommonFields()}
+            
+            {formData.role === 'user' && renderUserFields()}
+            {formData.role === 'hospital' && renderHospitalFields()}
+            {formData.role === 'paramedic' && renderParamedicFields()}
+            {formData.role === 'blood_bank' && renderBloodBankFields()}
 
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-red-600 text-white py-3 px-4 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:opacity-50 transition-colors duration-200"
+              className="w-full bg-red-600 text-white py-3 px-4 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:opacity-50 transition-colors duration-200"
         >
           {loading ? 'Registering...' : 'Register'}
         </button>
       </form>
+        </>
+      )}
     </div>
   );
 };

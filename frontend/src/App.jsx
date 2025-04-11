@@ -24,7 +24,7 @@ function App() {
           <Routes>
             <Route path="/" element={<Login setUser={setUser} setRole={setRole} />} />
             <Route path="/login" element={<Login setUser={setUser} setRole={setRole} />} />
-            <Route path="/register" element={<Register />} />
+            <Route path="/register" element={<Register setUser={setUser} setRole={setRole} />} />
             <Route path="/dashboard" element={<Dashboard user={user} role={role} />} />
             <Route path="/profile" element={<UserProfile user={user} />} />
             <Route path="/blood-request" element={<BloodRequest role={role} />} />

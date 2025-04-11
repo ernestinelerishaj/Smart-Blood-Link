@@ -1,10 +1,15 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { FaFingerprint, FaUserCheck, FaHistory, FaCheckCircle, FaTimesCircle, FaSpinner, 
-         FaUserPlus, FaTimes, FaUser, FaEnvelope, FaPhone, FaIdCard, FaTint } from 'react-icons/fa';
-import { MdVerified } from 'react-icons/md';
+         FaUserPlus, FaTimes, FaUser, FaEnvelope, FaPhone, FaIdCard, FaTint, FaMapMarkerAlt,
+         FaCalendarAlt, FaNotesMedical, FaClock, FaUserMd } from 'react-icons/fa';
+import { MdVerified, MdPerson } from 'react-icons/md';
 
-const Dashboard = ({ user, role }) => {
+const Dashboard = ({ user: userProp, role: roleProp }) => {
+  // Use props if available, otherwise check localStorage
+  const user = userProp || localStorage.getItem('user');
+  const role = roleProp || localStorage.getItem('role');
+  
   const [stats, setStats] = useState({
     totalDonations: 0,
     pendingRequests: 0,
@@ -34,6 +39,13 @@ const Dashboard = ({ user, role }) => {
     phone_number: '',
     blood_group: '',
     address: '',
+  });
+
+  const [registrationStatus, setRegistrationStatus] = useState({
+    success: false,
+    error: false,
+    message: '',
+    existingUser: false
   });
 
   useEffect(() => {
@@ -91,11 +103,11 @@ const Dashboard = ({ user, role }) => {
 
         // Update stats if needed
         if (role === 'hospital' || role === 'admin') {
-          setStats({
+    setStats({
             totalDonations: userDonations.length,
-            pendingRequests: 5,
-            availableUnits: 75,
-          });
+      pendingRequests: 5,
+      availableUnits: 75,
+    });
         }
       } catch (error) {
         console.error('Error fetching user data:', error.response?.data || error.message);
@@ -161,7 +173,8 @@ const Dashboard = ({ user, role }) => {
       } else {
         setVerificationStatus('failed');
       }
-    } catch (_) {
+    } catch (error) {
+      console.error('Verification error:', error);
       setVerificationStatus('error');
     } finally {
       setIsVerifying(false);
@@ -187,6 +200,13 @@ const Dashboard = ({ user, role }) => {
       );
 
       if (response.data) {
+        setRegistrationStatus({
+          success: true,
+          error: false,
+          message: 'Patient registered successfully!',
+          existingUser: false
+        });
+        
         // Add to recent verifications
         const newVerification = {
           id: Date.now(),
@@ -195,19 +215,44 @@ const Dashboard = ({ user, role }) => {
           timestamp: new Date().toLocaleString(),
         };
         setRecentVerifications(prev => [newVerification, ...prev.slice(0, 4)]);
-        setShowRegistrationModal(false);
-        setVerificationStatus('success');
-        setNewUserData({
-          username: '',
-          email: '',
-          password: '',
-          full_name: '',
-          phone_number: '',
-          blood_group: '',
-          address: '',
-        });
+        
+        // Don't immediately close modal - let user see success message
+        setTimeout(() => {
+          setShowRegistrationModal(false);
+          setVerificationStatus('success');
+          setNewUserData({
+            username: '',
+            email: '',
+            password: '',
+            full_name: '',
+            phone_number: '',
+            blood_group: '',
+            address: '',
+          });
+          setRegistrationStatus({
+            success: false,
+            error: false,
+            message: '',
+            existingUser: false
+          });
+        }, 3000);
       }
     } catch (error) {
+      if (error.response?.data?.detail?.includes('already registered')) {
+        setRegistrationStatus({
+          success: false,
+          error: true,
+          message: 'User already exists in the database',
+          existingUser: true
+        });
+      } else {
+        setRegistrationStatus({
+          success: false,
+          error: true,
+          message: error.response?.data?.detail || 'Registration failed. Please try again.',
+          existingUser: false
+        });
+      }
       console.error('Registration error:', error.response?.data || error.message);
     }
   };
@@ -237,86 +282,141 @@ const Dashboard = ({ user, role }) => {
   const renderRegistrationModal = () => (
     showRegistrationModal && (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl p-6 relative max-h-[90vh] overflow-y-auto">
-          <button
-            onClick={() => setShowRegistrationModal(false)}
-            className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
-          >
-            <FaTimes className="text-xl" />
-          </button>
-
-          <h3 className="text-2xl font-bold text-gray-800 mb-6 flex items-center">
-            <FaUserPlus className="mr-2 text-red-600" />
-            New Patient Registration
-          </h3>
-
+        <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-xl max-h-[90vh] overflow-y-auto">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-2xl font-bold text-gray-800">Register New Patient</h2>
+            <button 
+              onClick={() => {
+                setShowRegistrationModal(false);
+                setRegistrationStatus({
+                  success: false,
+                  error: false,
+                  message: '',
+                  existingUser: false
+                });
+              }}
+              className="text-gray-500 hover:text-gray-700"
+            >
+              <FaTimes />
+            </button>
+          </div>
+          
+          {/* Success Message */}
+          {registrationStatus.success && (
+            <div className="mb-4 p-3 bg-green-100 border-l-4 border-green-500 text-green-700 rounded">
+              <div className="flex">
+                <FaCheckCircle className="h-5 w-5 mr-2" />
+                <p>{registrationStatus.message}</p>
+              </div>
+              <p className="mt-2 text-sm">Patient has been added to the system.</p>
+            </div>
+          )}
+          
+          {/* Error Message */}
+          {registrationStatus.error && (
+            <div className="mb-4 p-3 bg-red-100 border-l-4 border-red-500 text-red-700 rounded">
+              <div className="flex">
+                <FaTimesCircle className="h-5 w-5 mr-2" />
+                <p>{registrationStatus.message}</p>
+              </div>
+              {registrationStatus.existingUser && (
+                <div className="mt-3">
+                  <p className="font-semibold">This user already exists in our database.</p>
+                  <button 
+                    onClick={() => {
+                      setShowRegistrationModal(false);
+                      setVerificationStatus('success');
+                      setRegistrationStatus({
+                        success: false,
+                        error: false,
+                        message: '',
+                        existingUser: false
+                      });
+                    }}
+                    className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                  >
+                    View Dashboard
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+          
           <form onSubmit={handleNewUserRegistration} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
-                  <FaUser className="mr-2 text-gray-400" />
-                  Username
+                  <FaUser className="mr-1" /> Username
                 </label>
                 <input
                   type="text"
                   value={newUserData.username}
-                  onChange={(e) => setNewUserData({ ...newUserData, username: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                  onChange={(e) => setNewUserData({...newUserData, username: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
                   required
                 />
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
-                  <FaEnvelope className="mr-2 text-gray-400" />
-                  Email
+                  <FaEnvelope className="mr-1" /> Email
                 </label>
                 <input
                   type="email"
                   value={newUserData.email}
-                  onChange={(e) => setNewUserData({ ...newUserData, email: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                  onChange={(e) => setNewUserData({...newUserData, email: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
                   required
                 />
               </div>
-
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                <FaLock className="mr-1" /> Password
+              </label>
+              <input
+                type="password"
+                value={newUserData.password}
+                onChange={(e) => setNewUserData({...newUserData, password: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                required
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                <FaIdCard className="mr-1" /> Full Name
+              </label>
+              <input
+                type="text"
+                value={newUserData.full_name}
+                onChange={(e) => setNewUserData({...newUserData, full_name: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                required
+              />
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
-                  <FaIdCard className="mr-2 text-gray-400" />
-                  Full Name
-                </label>
-                <input
-                  type="text"
-                  value={newUserData.full_name}
-                  onChange={(e) => setNewUserData({ ...newUserData, full_name: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
-                  <FaPhone className="mr-2 text-gray-400" />
-                  Phone Number
+                  <FaPhone className="mr-1" /> Phone Number
                 </label>
                 <input
                   type="tel"
                   value={newUserData.phone_number}
-                  onChange={(e) => setNewUserData({ ...newUserData, phone_number: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                  onChange={(e) => setNewUserData({...newUserData, phone_number: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
                   required
                 />
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
-                  <FaTint className="mr-2 text-gray-400" />
-                  Blood Group
+                  <FaTint className="mr-1" /> Blood Group
                 </label>
                 <select
                   value={newUserData.blood_group}
-                  onChange={(e) => setNewUserData({ ...newUserData, blood_group: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                  onChange={(e) => setNewUserData({...newUserData, blood_group: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
                   required
                 >
                   <option value="">Select Blood Group</option>
@@ -330,48 +430,30 @@ const Dashboard = ({ user, role }) => {
                   <option value="O-">O-</option>
                 </select>
               </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Password
-                </label>
-                <input
-                  type="password"
-                  value={newUserData.password}
-                  onChange={(e) => setNewUserData({ ...newUserData, password: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                  required
-                />
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Address
-                </label>
-                <textarea
-                  value={newUserData.address}
-                  onChange={(e) => setNewUserData({ ...newUserData, address: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                  rows="3"
-                  required
-                />
-              </div>
             </div>
-
-            <div className="flex justify-end space-x-3 mt-6">
-              <button
-                type="button"
-                onClick={() => setShowRegistrationModal(false)}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
-              >
-                Register Patient
-              </button>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                <FaMapMarkerAlt className="mr-1" /> Address
+              </label>
+              <textarea
+                value={newUserData.address}
+                onChange={(e) => setNewUserData({...newUserData, address: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                rows="3"
+                required
+              ></textarea>
+            </div>
+            
+            <div className="flex justify-end">
+              {!registrationStatus.success && (
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
+                >
+                  Register Patient
+                </button>
+              )}
             </div>
           </form>
         </div>
@@ -381,11 +463,14 @@ const Dashboard = ({ user, role }) => {
 
   const renderParamedicDashboard = () => (
     <div className="space-y-8">
-      <h2 className="text-2xl font-bold text-gray-800">Paramedic Dashboard</h2>
+      <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center">
+        <MdPerson className="mr-3 text-red-600 text-3xl" />
+        Paramedic Dashboard
+      </h2>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         {/* Fingerprint Verification Card */}
-        <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+        <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-100 hover:border-red-100 transition-all duration-300">
           <div className="p-6">
             <h3 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
               <FaFingerprint className="mr-2 text-red-600" />
@@ -395,18 +480,26 @@ const Dashboard = ({ user, role }) => {
             <div className="space-y-4">
               <div className="text-center">
                 {verificationStatus === 'success' ? (
-                  <div className="flex items-center justify-center text-green-500 mb-4">
-                    <FaCheckCircle className="text-5xl" />
+                  <div className="flex flex-col items-center justify-center text-green-500 mb-4">
+                    <FaCheckCircle className="text-6xl mb-2" />
+                    <p className="text-sm text-green-600 font-medium">Verification Successful</p>
                   </div>
                 ) : verificationStatus === 'failed' ? (
-                  <div className="flex items-center justify-center text-red-500 mb-4">
-                    <FaTimesCircle className="text-5xl" />
+                  <div className="flex flex-col items-center justify-center text-red-500 mb-4">
+                    <FaTimesCircle className="text-6xl mb-2" />
+                    <p className="text-sm text-red-600 font-medium">Verification Failed</p>
                   </div>
                 ) : verificationStatus === 'error' ? (
-                  <div className="text-red-500 mb-4">
-                    Error occurred during verification
+                  <div className="flex flex-col items-center justify-center text-red-500 mb-4">
+                    <FaTimesCircle className="text-6xl mb-2" />
+                    <p className="text-sm text-red-600 font-medium">Error occurred during verification</p>
                   </div>
-                ) : null}
+                ) : (
+                  <div className="flex flex-col items-center justify-center text-gray-400 mb-4">
+                    <FaFingerprint className="text-6xl mb-2" />
+                    <p className="text-sm text-gray-500 font-medium">Ready to verify</p>
+                  </div>
+                )}
                 
                 <button
                   onClick={handlePatientVerification}
@@ -414,8 +507,8 @@ const Dashboard = ({ user, role }) => {
                   className={`w-full py-3 px-4 rounded-lg flex items-center justify-center space-x-2 ${
                     isVerifying
                       ? 'bg-gray-100 text-gray-500'
-                      : 'bg-red-600 text-white hover:bg-red-700'
-                  } transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2`}
+                      : 'bg-gradient-to-r from-red-600 to-red-500 text-white hover:from-red-700 hover:to-red-600'
+                  } transition-all duration-300 transform hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 shadow-md`}
                 >
                   {isVerifying ? (
                     <>
@@ -432,71 +525,97 @@ const Dashboard = ({ user, role }) => {
               </div>
 
               {verificationStatus === 'success' && (
-                <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-                  <div className="flex items-center text-green-700">
-                    <MdVerified className="mr-2" />
-                    <span>Patient verified successfully!</span>
+                <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg animate-fadeIn">
+                  <div className="flex items-center text-green-700 mb-2">
+                    <MdVerified className="mr-2 text-xl" />
+                    <span className="font-medium">Patient verified successfully!</span>
                   </div>
+                  <p className="text-sm text-green-600">Patient information has been recorded.</p>
                 </div>
               )}
 
               {verificationStatus === 'failed' && (
                 <div className="mt-4 space-y-4">
-                  <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-                    <div className="flex items-center text-red-700">
+                  <div className="p-4 bg-red-50 border border-red-200 rounded-lg animate-fadeIn">
+                    <div className="flex items-center text-red-700 mb-2">
                       <FaTimesCircle className="mr-2" />
-                      <span>Verification failed. Patient not found in system.</span>
+                      <span className="font-medium">Verification failed. Patient not found in system.</span>
                     </div>
+                    <p className="text-sm text-red-600">Would you like to register this patient?</p>
                   </div>
                   
                   <button
                     onClick={() => setShowRegistrationModal(true)}
-                    className="w-full py-3 px-4 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 flex items-center justify-center"
+                    className="w-full py-3 px-4 bg-gradient-to-r from-green-600 to-green-500 text-white rounded-lg hover:from-green-700 hover:to-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-all duration-300 transform hover:scale-[1.02] shadow-md flex items-center justify-center"
                   >
                     <FaUserPlus className="mr-2" />
                     Register New Patient
-                  </button>
+          </button>
                 </div>
               )}
             </div>
           </div>
         </div>
 
-        {/* Recent Verifications Card */}
-        <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+        {/* Previous Patient Details Card */}
+        <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-100 hover:border-red-100 transition-all duration-300">
           <div className="p-6">
             <h3 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
               <FaHistory className="mr-2 text-red-600" />
-              Recent Verifications
+              Previous Patient Details
             </h3>
             
             <div className="divide-y divide-gray-200">
               {recentVerifications.map((verification) => (
-                <div key={verification.id} className="py-3 flex items-center justify-between">
-                  <div className="flex items-center">
-                    <div className={`mr-3 ${
-                      verification.status === 'verified' ? 'text-green-500' : 'text-red-500'
+                <div key={verification.id} className="py-4 first:pt-0 last:pb-0">
+                  <div className="flex items-start space-x-4">
+                    <div className={`flex-shrink-0 rounded-full p-2 ${
+                      verification.status === 'verified' ? 'bg-green-100' : 'bg-red-100'
                     }`}>
                       {verification.status === 'verified' ? (
-                        <FaCheckCircle />
+                        <FaUserCheck className={`text-xl ${
+                          verification.status === 'verified' ? 'text-green-600' : 'text-red-600'
+                        }`} />
                       ) : (
-                        <FaTimesCircle />
+                        <FaTimes className="text-xl text-red-600" />
                       )}
                     </div>
-                    <div>
-                      <p className="font-medium text-gray-800">{verification.name}</p>
-                      <p className="text-sm text-gray-500">{verification.timestamp}</p>
+                    <div className="flex-grow">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-medium text-gray-800">{verification.name}</h4>
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                          verification.status === 'verified'
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {verification.status === 'verified' ? 'Verified' : 'Failed'}
+                        </span>
+                      </div>
+                      <div className="mt-1 flex items-center text-sm text-gray-500">
+                        <FaClock className="mr-1" />
+                        {verification.timestamp}
+                      </div>
+                      {verification.status === 'verified' && (
+                        <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
+                          <div className="flex items-center text-gray-600">
+                            <FaTint className="mr-1 text-red-500" />
+                            {verification.blood_group || 'N/A'}
+                          </div>
+                          <div className="flex items-center text-gray-600">
+                            <FaMapMarkerAlt className="mr-1 text-gray-400" />
+                            {verification.location || 'N/A'}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
-                  <span className={`px-3 py-1 rounded-full text-sm ${
-                    verification.status === 'verified'
-                      ? 'bg-green-100 text-green-800'
-                      : 'bg-red-100 text-red-800'
-                  }`}>
-                    {verification.status === 'verified' ? 'Verified' : 'Failed'}
-                  </span>
                 </div>
               ))}
+              {recentVerifications.length === 0 && (
+                <div className="py-4 text-center text-gray-500">
+                  No previous patient records found
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -504,21 +623,25 @@ const Dashboard = ({ user, role }) => {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white p-6 rounded-xl shadow-lg">
+        <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-100 hover:border-red-100 transition-all duration-300">
           <div className="flex items-center justify-between">
-            <h4 className="text-lg font-semibold text-gray-700">Total Verifications</h4>
-            <FaUserCheck className="text-red-600 text-xl" />
+            <h4 className="text-lg font-semibold text-gray-700">Total Patients</h4>
+            <div className="p-2 bg-red-50 rounded-lg">
+              <FaUserCheck className="text-red-600 text-xl" />
+            </div>
           </div>
           <p className="text-3xl font-bold text-gray-900 mt-2">
             {recentVerifications.length}
           </p>
-          <p className="text-sm text-gray-500 mt-1">Last 24 hours</p>
+          <p className="text-sm text-gray-500 mt-1">Processed today</p>
         </div>
 
-        <div className="bg-white p-6 rounded-xl shadow-lg">
+        <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-100 hover:border-red-100 transition-all duration-300">
           <div className="flex items-center justify-between">
             <h4 className="text-lg font-semibold text-gray-700">Success Rate</h4>
-            <FaCheckCircle className="text-green-500 text-xl" />
+            <div className="p-2 bg-green-50 rounded-lg">
+              <FaCheckCircle className="text-green-600 text-xl" />
+            </div>
           </div>
           <p className="text-3xl font-bold text-gray-900 mt-2">
             {Math.round((recentVerifications.filter(v => v.status === 'verified').length / recentVerifications.length) * 100)}%
@@ -526,13 +649,17 @@ const Dashboard = ({ user, role }) => {
           <p className="text-sm text-gray-500 mt-1">Average success rate</p>
         </div>
 
-        <div className="bg-white p-6 rounded-xl shadow-lg">
+        <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-100 hover:border-red-100 transition-all duration-300">
           <div className="flex items-center justify-between">
-            <h4 className="text-lg font-semibold text-gray-700">Pending Verifications</h4>
-            <FaSpinner className="text-yellow-500 text-xl" />
+            <h4 className="text-lg font-semibold text-gray-700">Pending Cases</h4>
+            <div className="p-2 bg-yellow-50 rounded-lg">
+              <FaSpinner className="text-yellow-600 text-xl" />
+            </div>
           </div>
-          <p className="text-3xl font-bold text-gray-900 mt-2">0</p>
-          <p className="text-sm text-gray-500 mt-1">No pending requests</p>
+          <p className="text-3xl font-bold text-gray-900 mt-2">
+            {recentVerifications.length - recentVerifications.filter(v => v.status === 'verified').length}
+          </p>
+          <p className="text-sm text-gray-500 mt-1">Awaiting verification</p>
         </div>
       </div>
 
@@ -599,11 +726,96 @@ const Dashboard = ({ user, role }) => {
     </div>
   );
 
+  const renderBloodBankDashboard = () => (
+    <div className="space-y-6">
+      <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center">
+        <FaTint className="mr-3 text-red-600 text-3xl" />
+        Blood Bank Dashboard
+      </h2>
+      
+      {/* Blood Inventory Section */}
+      <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
+        <h3 className="text-xl font-semibold text-gray-800 mb-4">Blood Inventory</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map((type) => (
+            <div key={type} className="bg-gray-50 rounded-lg p-4 text-center">
+              <div className="text-xl font-bold text-red-600">{type}</div>
+              <div className="text-3xl font-bold mt-2">{Math.floor(Math.random() * 50)}</div>
+              <div className="text-sm text-gray-500 mt-1">units</div>
+            </div>
+          ))}
+        </div>
+      </div>
+      
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-100">
+          <div className="flex items-center justify-between">
+            <h4 className="text-lg font-semibold text-gray-700">Total Donations</h4>
+            <div className="p-2 bg-red-50 rounded-lg">
+              <FaTint className="text-red-600 text-xl" />
+            </div>
+          </div>
+          <p className="text-3xl font-bold text-gray-900 mt-2">125</p>
+          <p className="text-sm text-gray-500 mt-1">This month</p>
+        </div>
+        
+        <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-100">
+          <div className="flex items-center justify-between">
+            <h4 className="text-lg font-semibold text-gray-700">Requests</h4>
+            <div className="p-2 bg-blue-50 rounded-lg">
+              <FaUserMd className="text-blue-600 text-xl" />
+            </div>
+          </div>
+          <p className="text-3xl font-bold text-gray-900 mt-2">43</p>
+          <p className="text-sm text-gray-500 mt-1">Pending requests</p>
+        </div>
+        
+        <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-100">
+          <div className="flex items-center justify-between">
+            <h4 className="text-lg font-semibold text-gray-700">Expiring Soon</h4>
+            <div className="p-2 bg-yellow-50 rounded-lg">
+              <FaClock className="text-yellow-600 text-xl" />
+            </div>
+          </div>
+          <p className="text-3xl font-bold text-gray-900 mt-2">18</p>
+          <p className="text-sm text-gray-500 mt-1">Units expiring in 7 days</p>
+        </div>
+      </div>
+      
+      {/* Recent Activity */}
+      <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
+        <h3 className="text-xl font-semibold text-gray-800 mb-4">Recent Activity</h3>
+        <div className="divide-y divide-gray-200">
+          {[
+            { action: 'Donation Received', bloodType: 'O+', units: 2, hospital: 'City Hospital', time: '2 hours ago' },
+            { action: 'Blood Request', bloodType: 'AB-', units: 3, hospital: 'General Hospital', time: '5 hours ago' },
+            { action: 'Inventory Update', bloodType: 'A+', units: 5, hospital: 'Metro Clinic', time: '1 day ago' },
+            { action: 'Blood Dispatched', bloodType: 'B+', units: 2, hospital: 'Central Hospital', time: '2 days ago' },
+          ].map((activity, index) => (
+            <div key={index} className="py-4 first:pt-0 last:pb-0">
+              <div className="flex justify-between">
+                <div>
+                  <div className="font-medium">{activity.action}</div>
+                  <div className="text-sm text-gray-500 mt-1">
+                    {activity.bloodType} • {activity.units} units • {activity.hospital}
+                  </div>
+                </div>
+                <div className="text-sm text-gray-500">{activity.time}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div className="container mx-auto px-4 py-8">
       {role === 'user' && renderUserDashboard()}
       {role === 'paramedic' && renderParamedicDashboard()}
       {role === 'hospital' && renderHospitalDashboard()}
+      {role === 'blood_bank' && renderBloodBankDashboard()}
       {role === 'admin' && renderAdminDashboard()}
     </div>
   );

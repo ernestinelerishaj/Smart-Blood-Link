@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { FaUser, FaEnvelope, FaLock, FaIdCard, FaUserMd, FaHospital, FaPhone, FaMapMarkerAlt, FaTint, FaCalendar, FaFileAlt, FaFingerprint, FaCertificate, FaBriefcaseMedical, FaAward, FaClock, FaAmbulance } from 'react-icons/fa';
+import { FaUser, FaEnvelope, FaLock, FaIdCard, FaUserMd, FaHospital, FaPhone, FaMapMarkerAlt, FaTint, FaCalendar, FaFileAlt, FaFingerprint, FaCertificate, FaBriefcaseMedical, FaAward, FaClock, FaAmbulance, FaInfoCircle, FaHeartbeat, FaNewspaper, FaChartLine } from 'react-icons/fa';
 
-const Register = ({ setUser, setRole }) => {
+const Register = () => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     username: '',
@@ -19,21 +19,15 @@ const Register = ({ setUser, setRole }) => {
     blood_group: '',
     medical_history: '',
     biometric_data: '',
+    consulting_hospital: '',
+    consulting_doctors: '',
+    medical_reports: [],
     // Hospital specific fields
     hospital_name: '',
     hospital_registration_number: '',
     emergency_contact: '',
     available_facilities: [],
-    other_facilities: '',
-    // Facility checkboxes
-    facility_icu: false,
-    facility_emergency: false,
-    facility_blood_bank: false,
-    facility_pharmacy: false,
-    facility_lab: false,
-    facility_patient_care: false,
-    facility_ambulance: false,
-    facility_others: false,
+    license_proof: null,
     // Paramedic specific fields
     license_number: '',
     certification: '',
@@ -56,20 +50,13 @@ const Register = ({ setUser, setRole }) => {
     setLoading(true);
     setError('');
 
-    // Check if passwords match
-    if (formData.password !== formData.confirm_password) {
-      setError('Passwords do not match');
-      setLoading(false);
-      return;
-    }
-
     try {
       // Create a new object with only the common fields
       const submitData = {
         username: formData.username,
         email: formData.email,
         password: formData.password,
-        full_name: formData.full_name || formData.username, // Use username as full_name if removed
+        full_name: formData.full_name,
         role: formData.role,
         phone_number: formData.phone_number,
         address: formData.address,
@@ -82,26 +69,16 @@ const Register = ({ setUser, setRole }) => {
           blood_group: formData.blood_group,
           medical_history: formData.medical_history,
           biometric_data: formData.biometric_data,
+          consulting_hospital: formData.consulting_hospital,
+          consulting_doctors: formData.consulting_doctors,
+          medical_reports: formData.medical_reports,
         });
       } else if (formData.role === 'hospital') {
-        // Process facilities from checkboxes into an array
-        const facilities = [];
-        if (formData.facility_icu) facilities.push('ICU');
-        if (formData.facility_emergency) facilities.push('Emergency Room');
-        if (formData.facility_blood_bank) facilities.push('Blood Bank');
-        if (formData.facility_pharmacy) facilities.push('Pharmacy');
-        if (formData.facility_lab) facilities.push('Lab Services');
-        if (formData.facility_patient_care) facilities.push('Inpatient/Outpatient');
-        if (formData.facility_ambulance) facilities.push('Ambulance');
-        if (formData.facility_others && formData.other_facilities) {
-          facilities.push(formData.other_facilities);
-        }
-
         Object.assign(submitData, {
           hospital_name: formData.hospital_name,
           hospital_registration_number: formData.hospital_registration_number,
           emergency_contact: formData.emergency_contact,
-          available_facilities: facilities,
+          available_facilities: formData.available_facilities,
         });
       } else if (formData.role === 'paramedic') {
         Object.assign(submitData, {
@@ -138,10 +115,6 @@ const Register = ({ setUser, setRole }) => {
           localStorage.setItem('user', formData.username);
           localStorage.setItem('role', formData.role);
 
-          // Update App component state
-          setUser(formData.username);
-          setRole(formData.role);
-
           // Set success state
           setRegistrationSuccess(true);
           setSuccessMessage('Registration successful! You are now logged in.');
@@ -168,7 +141,7 @@ const Register = ({ setUser, setRole }) => {
       } else if (err.response?.status === 400 && err.response?.data?.detail?.includes('already registered')) {
         setError('Username or email already registered. Please try different credentials.');
       } else {
-      setError(err.response?.data?.detail || 'Registration failed. Please try again.');
+        setError(err.response?.data?.detail || 'Registration failed. Please try again.');
       }
     } finally {
       setLoading(false);
@@ -236,7 +209,7 @@ const Register = ({ setUser, setRole }) => {
         <FaTint className="mr-2" />
         Blood Bank
       </button>
-        </div>
+    </div>
   );
 
   const renderCommonFields = () => (
@@ -267,7 +240,7 @@ const Register = ({ setUser, setRole }) => {
             required
           />
         </div>
-        </div>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="form-group">
@@ -295,7 +268,7 @@ const Register = ({ setUser, setRole }) => {
             required
           />
         </div>
-        </div>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="form-group">
@@ -364,29 +337,84 @@ const Register = ({ setUser, setRole }) => {
             <option value="O-">O-</option>
           </select>
         </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="form-group">
+          <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
+            <FaHospital className="mr-2" /> Consulting Hospital
+          </label>
+          <input
+            type="text"
+            value={formData.consulting_hospital}
+            onChange={(e) => setFormData({ ...formData, consulting_hospital: e.target.value })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+          />
         </div>
+
+        <div className="form-group">
+          <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
+            <FaUserMd className="mr-2" /> Consulting Doctor(s)
+          </label>
+          <input
+            type="text"
+            value={formData.consulting_doctors}
+            onChange={(e) => setFormData({ ...formData, consulting_doctors: e.target.value })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+            placeholder="Enter doctor names separated by commas"
+          />
+        </div>
+      </div>
+
+      <div className="form-group">
+        <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
+          <FaFileAlt className="mr-2" /> Medical Reports or Scans
+        </label>
+        <div className="relative">
+          <input
+            type="file"
+            multiple
+            accept=".pdf, .jpg, .png"
+            onChange={(e) => {
+              const files = Array.from(e.target.files);
+              setFormData({ ...formData, medical_reports: files });
+            }}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+          />
+          {formData.medical_reports.length > 0 && (
+            <div className="mt-2">
+              <p className="text-sm text-gray-600">Selected files:</p>
+              <ul className="list-disc list-inside text-sm text-gray-600">
+                {formData.medical_reports.map((file, index) => (
+                  <li key={index}>{file.name}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      </div>
 
       <div className="form-group">
         <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
           <FaFileAlt className="mr-2" /> Medical History
         </label>
-          <textarea
+        <textarea
           value={formData.medical_history}
           onChange={(e) => setFormData({ ...formData, medical_history: e.target.value })}
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
-            placeholder="Enter any relevant medical history"
-          />
-        </div>
+          placeholder="Enter any relevant medical history"
+        />
+      </div>
 
       <div className="form-group">
-          <button
-            type="button"
-            onClick={handleBiometric}
+        <button
+          type="button"
+          onClick={handleBiometric}
           className="flex items-center justify-center w-full px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500"
-          >
+        >
           <FaFingerprint className="mr-2" />
           {formData.biometric_data ? 'Biometric Data Collected' : 'Collect Biometric Data'}
-          </button>
+        </button>
       </div>
     </>
   );
@@ -410,6 +438,9 @@ const Register = ({ setUser, setRole }) => {
         <div className="form-group">
           <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
             <FaCertificate className="mr-2" /> Registration Number
+            <span className="ml-2 text-gray-400 cursor-help" title="Issued by your state health authority or Drugs Control Department">
+              <FaInfoCircle />
+            </span>
           </label>
           <input
             type="text"
@@ -433,110 +464,153 @@ const Register = ({ setUser, setRole }) => {
         />
       </div>
 
-      <div className="form-group mt-4">
-        <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
+      <div className="form-group">
+        <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
           <FaBriefcaseMedical className="mr-2" /> Available Facilities
         </label>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-          <div>
-            <label className="inline-flex items-center">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="flex items-center">
               <input
                 type="checkbox"
-                checked={formData.facility_icu}
-                onChange={(e) => setFormData({ ...formData, facility_icu: e.target.checked })}
+                checked={formData.available_facilities.includes('ICU')}
+                onChange={(e) => {
+                  const facilities = e.target.checked
+                    ? [...formData.available_facilities, 'ICU']
+                    : formData.available_facilities.filter(f => f !== 'ICU');
+                  setFormData({ ...formData, available_facilities: facilities });
+                }}
                 className="form-checkbox h-5 w-5 text-red-600"
               />
-              <span className="ml-2 text-gray-700">ICU</span>
+              <span className="ml-2">ICU</span>
+            </label>
+            <label className="flex items-center">
+              <input
+                type="checkbox"
+                checked={formData.available_facilities.includes('Emergency Room')}
+                onChange={(e) => {
+                  const facilities = e.target.checked
+                    ? [...formData.available_facilities, 'Emergency Room']
+                    : formData.available_facilities.filter(f => f !== 'Emergency Room');
+                  setFormData({ ...formData, available_facilities: facilities });
+                }}
+                className="form-checkbox h-5 w-5 text-red-600"
+              />
+              <span className="ml-2">Emergency Room</span>
+            </label>
+            <label className="flex items-center">
+              <input
+                type="checkbox"
+                checked={formData.available_facilities.includes('Blood Bank')}
+                onChange={(e) => {
+                  const facilities = e.target.checked
+                    ? [...formData.available_facilities, 'Blood Bank']
+                    : formData.available_facilities.filter(f => f !== 'Blood Bank');
+                  setFormData({ ...formData, available_facilities: facilities });
+                }}
+                className="form-checkbox h-5 w-5 text-red-600"
+              />
+              <span className="ml-2">Blood Bank</span>
+            </label>
+            <label className="flex items-center">
+              <input
+                type="checkbox"
+                checked={formData.available_facilities.includes('Pharmacy')}
+                onChange={(e) => {
+                  const facilities = e.target.checked
+                    ? [...formData.available_facilities, 'Pharmacy']
+                    : formData.available_facilities.filter(f => f !== 'Pharmacy');
+                  setFormData({ ...formData, available_facilities: facilities });
+                }}
+                className="form-checkbox h-5 w-5 text-red-600"
+              />
+              <span className="ml-2">Pharmacy</span>
             </label>
           </div>
-          <div>
-            <label className="inline-flex items-center">
+          <div className="space-y-2">
+            <label className="flex items-center">
               <input
                 type="checkbox"
-                checked={formData.facility_emergency}
-                onChange={(e) => setFormData({ ...formData, facility_emergency: e.target.checked })}
+                checked={formData.available_facilities.includes('Lab Services')}
+                onChange={(e) => {
+                  const facilities = e.target.checked
+                    ? [...formData.available_facilities, 'Lab Services']
+                    : formData.available_facilities.filter(f => f !== 'Lab Services');
+                  setFormData({ ...formData, available_facilities: facilities });
+                }}
                 className="form-checkbox h-5 w-5 text-red-600"
               />
-              <span className="ml-2 text-gray-700">Emergency Room</span>
+              <span className="ml-2">Lab Services</span>
             </label>
-          </div>
-          <div>
-            <label className="inline-flex items-center">
+            <label className="flex items-center">
               <input
                 type="checkbox"
-                checked={formData.facility_blood_bank}
-                onChange={(e) => setFormData({ ...formData, facility_blood_bank: e.target.checked })}
+                checked={formData.available_facilities.includes('Inpatient/Outpatient')}
+                onChange={(e) => {
+                  const facilities = e.target.checked
+                    ? [...formData.available_facilities, 'Inpatient/Outpatient']
+                    : formData.available_facilities.filter(f => f !== 'Inpatient/Outpatient');
+                  setFormData({ ...formData, available_facilities: facilities });
+                }}
                 className="form-checkbox h-5 w-5 text-red-600"
               />
-              <span className="ml-2 text-gray-700">Blood Bank</span>
+              <span className="ml-2">Inpatient/Outpatient</span>
             </label>
-          </div>
-          <div>
-            <label className="inline-flex items-center">
+            <label className="flex items-center">
               <input
                 type="checkbox"
-                checked={formData.facility_pharmacy}
-                onChange={(e) => setFormData({ ...formData, facility_pharmacy: e.target.checked })}
+                checked={formData.available_facilities.includes('Ambulance')}
+                onChange={(e) => {
+                  const facilities = e.target.checked
+                    ? [...formData.available_facilities, 'Ambulance']
+                    : formData.available_facilities.filter(f => f !== 'Ambulance');
+                  setFormData({ ...formData, available_facilities: facilities });
+                }}
                 className="form-checkbox h-5 w-5 text-red-600"
               />
-              <span className="ml-2 text-gray-700">Pharmacy</span>
+              <span className="ml-2">Ambulance</span>
             </label>
-          </div>
-          <div>
-            <label className="inline-flex items-center">
+            <div className="flex items-center">
               <input
                 type="checkbox"
-                checked={formData.facility_lab}
-                onChange={(e) => setFormData({ ...formData, facility_lab: e.target.checked })}
+                checked={formData.available_facilities.includes('Others')}
+                onChange={(e) => {
+                  const facilities = e.target.checked
+                    ? [...formData.available_facilities, 'Others']
+                    : formData.available_facilities.filter(f => f !== 'Others');
+                  setFormData({ ...formData, available_facilities: facilities });
+                }}
                 className="form-checkbox h-5 w-5 text-red-600"
               />
-              <span className="ml-2 text-gray-700">Lab Services</span>
-            </label>
-          </div>
-          <div>
-            <label className="inline-flex items-center">
-              <input
-                type="checkbox"
-                checked={formData.facility_patient_care}
-                onChange={(e) => setFormData({ ...formData, facility_patient_care: e.target.checked })}
-                className="form-checkbox h-5 w-5 text-red-600"
-              />
-              <span className="ml-2 text-gray-700">Inpatient/Outpatient</span>
-            </label>
-          </div>
-          <div>
-            <label className="inline-flex items-center">
-              <input
-                type="checkbox"
-                checked={formData.facility_ambulance}
-                onChange={(e) => setFormData({ ...formData, facility_ambulance: e.target.checked })}
-                className="form-checkbox h-5 w-5 text-red-600"
-              />
-              <span className="ml-2 text-gray-700">Ambulance</span>
-            </label>
-          </div>
-          <div>
-            <label className="inline-flex items-center">
-              <input
-                type="checkbox"
-                checked={formData.facility_others}
-                onChange={(e) => setFormData({ ...formData, facility_others: e.target.checked })}
-                className="form-checkbox h-5 w-5 text-red-600"
-              />
-              <span className="ml-2 text-gray-700">Others</span>
-            </label>
+              <span className="ml-2">Others</span>
+              {formData.available_facilities.includes('Others') && (
+                <input
+                  type="text"
+                  placeholder="Specify other facilities"
+                  className="ml-2 px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                  onChange={(e) => {
+                    const facilities = formData.available_facilities.filter(f => f !== 'Others');
+                    setFormData({ ...formData, available_facilities: [...facilities, `Others: ${e.target.value}`] });
+                  }}
+                />
+              )}
+            </div>
           </div>
         </div>
-        {formData.facility_others && (
-          <div className="mt-3">
-            <textarea
-              value={formData.other_facilities}
-              onChange={(e) => setFormData({ ...formData, other_facilities: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
-              placeholder="Please specify other facilities"
-              rows="2"
-            />
-          </div>
+      </div>
+
+      <div className="form-group">
+        <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
+          <FaFileAlt className="mr-2" /> License/Registration Proof
+        </label>
+        <input
+          type="file"
+          accept=".pdf,.jpg,.png"
+          onChange={(e) => setFormData({ ...formData, license_proof: e.target.files[0] })}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+        />
+        {formData.license_proof && (
+          <p className="text-sm text-gray-600 mt-1">Selected file: {formData.license_proof.name}</p>
         )}
       </div>
     </>
@@ -696,54 +770,196 @@ const Register = ({ setUser, setRole }) => {
   );
 
   return (
-    <div className="max-w-4xl mx-auto mt-10 p-8 bg-white rounded-xl shadow-lg">
-      <h2 className="text-3xl font-bold mb-8 text-center text-gray-800">
-        {formData.role === 'user' ? 'User Registration' :
-         formData.role === 'hospital' ? 'Hospital Registration' :
-         formData.role === 'paramedic' ? 'Paramedic Registration' :
-         'Blood Bank Registration'}
-      </h2>
-      
-      {registrationSuccess && (
-        <div className="mb-6 p-4 bg-green-100 border-l-4 border-green-500 text-green-700 rounded-md">
-          <div className="flex items-center">
-            <svg className="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-            </svg>
-            <p className="font-medium">{successMessage}</p>
+    <div className="min-h-screen bg-gradient-to-br from-red-50 to-white">
+      {/* Hero Section */}
+      <div className="bg-red-600 text-white py-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center">
+            <h1 className="text-4xl font-bold mb-4">Join Smart Blood Link</h1>
+            <p className="text-xl mb-8">Together, we can bridge the gap between blood donors and those in need</p>
           </div>
-          <p className="mt-2 text-sm">Redirecting to your dashboard...</p>
         </div>
-      )}
-      
-      {error && (
-        <div className="mb-6 p-4 bg-red-100 border-l-4 border-red-500 text-red-700 rounded-md">
-          <p className="font-medium">Error</p>
-          <p style={{ whiteSpace: 'pre-line' }}>{error}</p>
-        </div>
-      )}
-      
-      {!registrationSuccess && (
-        <>
-          {renderRoleSelection()}
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {renderCommonFields()}
-            
-            {formData.role === 'user' && renderUserFields()}
-            {formData.role === 'hospital' && renderHospitalFields()}
-            {formData.role === 'paramedic' && renderParamedicFields()}
-            {formData.role === 'blood_bank' && renderBloodBankFields()}
+      </div>
 
-        <button
-          type="submit"
-          disabled={loading}
-              className="w-full bg-red-600 text-white py-3 px-4 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:opacity-50 transition-colors duration-200"
-        >
-          {loading ? 'Registering...' : 'Register'}
-        </button>
-      </form>
-        </>
-      )}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        {/* Registration Form Section - Moved to top */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-16">
+          {/* Registration Form */}
+          <div className="lg:col-span-2">
+            <div className="bg-white p-8 rounded-xl shadow-lg">
+              <h2 className="text-3xl font-bold mb-8 text-center text-gray-800">
+                {formData.role === 'user' ? 'User Registration' :
+                 formData.role === 'hospital' ? 'Hospital Registration' :
+                 formData.role === 'paramedic' ? 'Paramedic Registration' :
+                 'Blood Bank Registration'}
+              </h2>
+              
+              {/* Success and Error Messages */}
+              {registrationSuccess && (
+                <div className="mb-6 p-4 bg-green-100 border-l-4 border-green-500 text-green-700 rounded-md">
+                  <div className="flex items-center">
+                    <svg className="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                    <p className="font-medium">{successMessage}</p>
+                  </div>
+                  <p className="mt-2 text-sm">Redirecting to your dashboard...</p>
+                </div>
+              )}
+              
+              {error && (
+                <div className="mb-6 p-4 bg-red-100 border-l-4 border-red-500 text-red-700 rounded-md">
+                  <p className="font-medium">Error</p>
+                  <p style={{ whiteSpace: 'pre-line' }}>{error}</p>
+                </div>
+              )}
+              
+              {!registrationSuccess && (
+                <>
+                  {renderRoleSelection()}
+                  <form onSubmit={handleSubmit} className="space-y-6">
+                    {renderCommonFields()}
+                    
+                    {formData.role === 'user' && renderUserFields()}
+                    {formData.role === 'hospital' && renderHospitalFields()}
+                    {formData.role === 'paramedic' && renderParamedicFields()}
+                    {formData.role === 'blood_bank' && renderBloodBankFields()}
+
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="w-full bg-red-600 text-white py-3 px-4 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:opacity-50 transition-colors duration-200"
+                    >
+                      {loading ? 'Registering...' : 'Register'}
+                    </button>
+                  </form>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Side Information */}
+          <div className="lg:col-span-1">
+            <div className="sticky top-8">
+              <div className="bg-white/80 backdrop-blur-sm p-8 rounded-xl shadow-lg space-y-8">
+                <div className="text-center">
+                  <div className="w-20 h-20 mx-auto bg-red-100 rounded-full flex items-center justify-center mb-4">
+                    <FaHeartbeat className="h-10 w-10 text-red-600" />
+                  </div>
+                  <h3 className="text-2xl font-bold text-gray-800 mb-2">Why Join Us?</h3>
+                  <p className="text-gray-600">Be part of a life-saving network</p>
+                </div>
+
+                <div className="space-y-6">
+                  <div className="bg-red-50 p-4 rounded-lg">
+                    <h4 className="font-semibold text-red-800 mb-2">Instant Alerts</h4>
+                    <p className="text-gray-700">Receive immediate notifications for blood needs in your area</p>
+                  </div>
+
+                  <div className="bg-red-50 p-4 rounded-lg">
+                    <h4 className="font-semibold text-red-800 mb-2">Smart Matching</h4>
+                    <p className="text-gray-700">Our AI matches donors with recipients efficiently</p>
+                  </div>
+
+                  <div className="bg-red-50 p-4 rounded-lg">
+                    <h4 className="font-semibold text-red-800 mb-2">Save Lives</h4>
+                    <p className="text-gray-700">Join thousands who've already made a difference</p>
+                  </div>
+                </div>
+
+                <div className="text-center">
+                  <p className="text-sm text-gray-600 mb-4">Already have an account?</p>
+                  <button
+                    onClick={() => navigate('/login')}
+                    className="inline-flex items-center px-6 py-3 border border-red-600 text-red-600 rounded-full hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors duration-200"
+                  >
+                    Sign in to your account
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Statistics Section */}
+        <div className="mb-16">
+          <h2 className="text-3xl font-bold text-gray-900 mb-8">Impact Statistics</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="bg-white p-6 rounded-xl shadow-lg text-center">
+              <div className="text-4xl font-bold text-red-600 mb-2">5,000+</div>
+              <div className="text-gray-600">Lives Saved</div>
+            </div>
+            <div className="bg-white p-6 rounded-xl shadow-lg text-center">
+              <div className="text-4xl font-bold text-red-600 mb-2">200+</div>
+              <div className="text-gray-600">Connected Blood Banks</div>
+            </div>
+            <div className="bg-white p-6 rounded-xl shadow-lg text-center">
+              <div className="text-4xl font-bold text-red-600 mb-2">15,000+</div>
+              <div className="text-gray-600">Registered Donors</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Latest News */}
+        <div className="mb-16">
+          <h2 className="text-3xl font-bold text-gray-900 mb-8">Recent Blood Bank News</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {/* News Card 1 */}
+            <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+              <img 
+                src="short.jpg" 
+                alt="Blood shortage crisis" 
+                className="w-full h-48 object-cover"
+              />
+              <div className="p-6">
+                <div className="text-red-600 text-sm font-semibold mb-2">Breaking News</div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">Critical Blood Shortage Hits Major Cities</h3>
+                <p className="text-gray-600 mb-4">Multiple hospitals report severe blood shortage, leading to delayed surgeries and emergency situations...</p>
+                <div className="flex items-center text-sm text-gray-500">
+                  <FaNewspaper className="mr-2" />
+                  <span>2 hours ago</span>
+                </div>
+              </div>
+            </div>
+
+            {/* News Card 2 */}
+            <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+              <img 
+                src="donor.png" 
+                alt="Blood donation drive" 
+                className="w-full h-48 object-cover"
+              />
+              <div className="p-6">
+                <div className="text-red-600 text-sm font-semibold mb-2">Success Story</div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">Smart Blood Link Saves Lives in Emergency</h3>
+                <p className="text-gray-600 mb-4">Quick response through our platform helped connect a rare blood type donor with a patient in critical condition...</p>
+                <div className="flex items-center text-sm text-gray-500">
+                  <FaNewspaper className="mr-2" />
+                  <span>1 day ago</span>
+                </div>
+              </div>
+            </div>
+
+            {/* News Card 3 */}
+            <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+              <img 
+                src="digital.jpg" 
+                alt="Digital healthcare" 
+                className="w-full h-48 object-cover"
+              />
+              <div className="p-6">
+                <div className="text-red-600 text-sm font-semibold mb-2">Feature Update</div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">New Real-time Blood Bank Locator</h3>
+                <p className="text-gray-600 mb-4">Smart Blood Link introduces real-time tracking of blood availability across registered blood banks...</p>
+                <div className="flex items-center text-sm text-gray-500">
+                  <FaNewspaper className="mr-2" />
+                  <span>3 days ago</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

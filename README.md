@@ -1,6 +1,8 @@
 # Smart Blood Link
 
-A comprehensive blood bank management system with role-based access control and biometric authentication support.
+## 🩸 Project Overview
+
+Smart Blood Link is a full-stack blood bank management system designed to improve the efficiency and accessibility of blood donation services. By leveraging role-based access, real-time updates, and biometric authentication, it streamlines operations for hospitals, paramedics, and donors while ensuring secure data handling. The project addresses the growing need for **digitized emergency blood management**, especially in underserved regions.
 
 ## Features
 
@@ -13,6 +15,11 @@ A comprehensive blood bank management system with role-based access control and 
 - Biometric verification (simulated)
 
 ## Tech Stack
+
+## 🌐 Live Demo
+
+🩸 **Smart Blood Link is live!**  
+🔗 [Visit the App](https://smart-blood-link.vercel.app/)  
 
 ### Frontend
 - React

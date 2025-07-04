@@ -1,24 +1,131 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import axios from 'axios';
+import { FaCheckCircle } from 'react-icons/fa';
 
-const UserProfile = ({ user }) => {
+const UserProfile = () => {
   const [profile, setProfile] = useState({
-    name: user.name || '',
-    dateOfBirth: user.dateOfBirth || '',
-    phoneNumber: user.phoneNumber || '',
-    address: user.address || '',
-    bloodGroup: user.bloodGroup || '',
-    medicalHistory: user.medicalHistory || 'No significant medical history',
-    biometricData: user.biometricData || '',
+    username: '',
+    full_name: '',
+    email: '',
+    date_of_birth: '',
+    phone_number: '',
+    address: '',
+    blood_group: '',
+    medical_history: '',
+    biometric_data: '',
   });
 
   const [isEditing, setIsEditing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    setIsEditing(false);
-    // Here we would typically send the updated profile to the backend
-    console.log('Updated profile:', { ...profile, userId: user.id });
+  useEffect(() => {
+    fetchUserProfile();
+  }, []);
+
+  const fetchUserProfile = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setError('Authentication token not found');
+        return;
+      }
+
+      const response = await axios.get('http://localhost:8000/users/me', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      setProfile({
+        username: response.data.username || '',
+        full_name: response.data.full_name || '',
+        email: response.data.email || '',
+        date_of_birth: response.data.date_of_birth || '',
+        phone_number: response.data.phone_number || '',
+        address: response.data.address || '',
+        blood_group: response.data.blood_group || '',
+        medical_history: response.data.medical_history || '',
+        biometric_data: response.data.biometric_data || '',
+      });
+      setLoading(false);
+    } catch (error) {
+      console.error('Profile fetch error:', error.response?.data || error.message);
+      setError(error.response?.data?.detail || 'Failed to fetch user profile');
+      setLoading(false);
+    }
   };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccessMessage('');
+    
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setError('Authentication token not found');
+        return;
+      }
+
+      await axios.put('http://localhost:8000/users/me', profile, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      setSuccessMessage('Profile updated successfully!');
+      setIsEditing(false);
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to update profile');
+    }
+  };
+
+  const handleBiometric = async () => {
+    try {
+      setError('');
+      // Simulate biometric data collection
+      const biometricData = 'bio_' + Math.random().toString(36).substr(2, 9);
+      
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setError('Authentication token not found');
+        return;
+      }
+
+      // Update user with new biometric data
+      await axios.put(
+        'http://localhost:8000/users/me',
+        { biometric_data: biometricData },
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      // Update local state
+      setProfile(prev => ({
+        ...prev,
+        biometric_data: biometricData
+      }));
+
+      setSuccessMessage('Biometric data verified and stored successfully!');
+    } catch (error) {
+      console.error('Biometric update error:', error.response?.data || error.message);
+      setError(error.response?.data?.detail || 'Failed to update biometric data');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -35,95 +142,64 @@ const UserProfile = ({ user }) => {
               </button>
             </div>
 
+            {error && (
+              <div className="mb-4 p-4 bg-red-100 border-l-4 border-red-500 text-red-700">
+                {error}
+              </div>
+            )}
+
+            {successMessage && (
+              <div className="mb-4 p-4 bg-green-100 border-l-4 border-green-500 text-green-700">
+                {successMessage}
+              </div>
+            )}
+
             {isEditing ? (
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Name
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700">Full Name</label>
                   <input
                     type="text"
-                    value={profile.name}
-                    onChange={(e) =>
-                      setProfile({ ...profile, name: e.target.value })
-                    }
+                    value={profile.full_name}
+                    onChange={(e) => setProfile({ ...profile, full_name: e.target.value })}
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Date of Birth
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700">Date of Birth</label>
                   <input
                     type="date"
-                    value={profile.dateOfBirth}
-                    onChange={(e) =>
-                      setProfile({ ...profile, dateOfBirth: e.target.value })
-                    }
+                    value={profile.date_of_birth}
+                    onChange={(e) => setProfile({ ...profile, date_of_birth: e.target.value })}
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Phone Number
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700">Phone Number</label>
                   <input
                     type="tel"
-                    value={profile.phoneNumber}
-                    onChange={(e) =>
-                      setProfile({ ...profile, phoneNumber: e.target.value })
-                    }
+                    value={profile.phone_number}
+                    onChange={(e) => setProfile({ ...profile, phone_number: e.target.value })}
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Address
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700">Address</label>
                   <textarea
                     value={profile.address}
-                    onChange={(e) =>
-                      setProfile({ ...profile, address: e.target.value })
-                    }
+                    onChange={(e) => setProfile({ ...profile, address: e.target.value })}
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Blood Group
-                  </label>
-                  <select
-                    value={profile.bloodGroup}
-                    onChange={(e) =>
-                      setProfile({ ...profile, bloodGroup: e.target.value })
-                    }
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500"
-                  >
-                    <option value="">Select Blood Type</option>
-                    <option value="A+">A+</option>
-                    <option value="A-">A-</option>
-                    <option value="B+">B+</option>
-                    <option value="B-">B-</option>
-                    <option value="AB+">AB+</option>
-                    <option value="AB-">AB-</option>
-                    <option value="O+">O+</option>
-                    <option value="O-">O-</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Medical History
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700">Medical History</label>
                   <textarea
-                    value={profile.medicalHistory}
-                    onChange={(e) =>
-                      setProfile({ ...profile, medicalHistory: e.target.value })
-                    }
+                    value={profile.medical_history}
+                    onChange={(e) => setProfile({ ...profile, medical_history: e.target.value })}
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500"
                   />
                 </div>
@@ -138,54 +214,62 @@ const UserProfile = ({ user }) => {
             ) : (
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Name
-                  </label>
-                  <p className="mt-1">{profile.name}</p>
+                  <label className="block text-sm font-medium text-gray-700">Username</label>
+                  <p className="mt-1">{profile.username}</p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Date of Birth
-                  </label>
-                  <p className="mt-1">{profile.dateOfBirth}</p>
+                  <label className="block text-sm font-medium text-gray-700">Email</label>
+                  <p className="mt-1">{profile.email}</p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Phone Number
-                  </label>
-                  <p className="mt-1">{profile.phoneNumber}</p>
+                  <label className="block text-sm font-medium text-gray-700">Full Name</label>
+                  <p className="mt-1">{profile.full_name}</p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Address
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700">Date of Birth</label>
+                  <p className="mt-1">{profile.date_of_birth}</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Phone Number</label>
+                  <p className="mt-1">{profile.phone_number}</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Address</label>
                   <p className="mt-1">{profile.address}</p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Blood Group
-                  </label>
-                  <p className="mt-1">{profile.bloodGroup}</p>
+                  <label className="block text-sm font-medium text-gray-700">Blood Group</label>
+                  <p className="mt-1">{profile.blood_group}</p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Medical History
-                  </label>
-                  <p className="mt-1">{profile.medicalHistory}</p>
+                  <label className="block text-sm font-medium text-gray-700">Medical History</label>
+                  <p className="mt-1">{profile.medical_history || 'No medical history recorded'}</p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Biometric Data
-                  </label>
-                  <p className="mt-1 text-sm text-gray-500">
-                    {profile.biometricData}
-                  </p>
+                  <label className="block text-sm font-medium text-gray-700">Biometric Data</label>
+                  <div className="mt-1 flex items-center">
+                    {profile.biometric_data ? (
+                      <div className="flex items-center text-green-600">
+                        <FaCheckCircle className="mr-2" />
+                        <span>Verified and Stored</span>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={handleBiometric}
+                        className="bg-gray-100 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-200"
+                      >
+                        Verify Biometric Data
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
